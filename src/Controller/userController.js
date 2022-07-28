@@ -1,6 +1,7 @@
-const usermodel = require("../models/UserModel.js");
+const usermodel = require("../Model/UserModel.js");
 const jwt = require("jsonwebtoken");
-
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 
 const isValid = function (value) {
@@ -12,8 +13,16 @@ const titleValid = function (title) {
     return ["Mr", "Mrs", "Miss"].indexOf(title) !== -1
 
 }
+const isValidRequestBody = (requestBody) => {
+    return Object.keys(requestBody).length !== 0;
+};
+
+const isValidObjectId = (objectId) => {
+    return mongoose.Types.ObjectId.isValid(objectId);
+};
+
 // user register==========================================================
-const createUser = async function (req, res) {
+const user = async function (req, res) {
     try {
         let userData = req.body
         if (Object.keys(userData) == 0) {
@@ -22,18 +31,8 @@ const createUser = async function (req, res) {
         if (!userData.title) {
             return res.status(400).send({ status: false, msg: "title is required" })
         }
-        if (!titleValid(userData.title.trim())) {
-            return res.status(400).send({ status: false, msg: "please Enter valid title" })
-        }
         if (!isValid(userData.name)) {
             return res.status(400).send({ status: false, msg: "name is required" })
-        }
-        if (!(/^[6-9]\d{9}$/.test(userData.mobile.trim()))) {
-            return res.status(400).send({ status: false, msg: "invalid mobile Number" })
-        }
-        let dupMobile = await usermodel.findOne({ mobile: userData.mobile })
-        if (dupMobile) {
-            return res.status(400).send({ status: false, msg: "this mobile Number is already registered" })
         }
         if (!isValid(userData.email)) {
             return res.status(400).send({ status: false, msg: "email is required" })
@@ -48,22 +47,16 @@ const createUser = async function (req, res) {
         if (!isValid(userData.password)) {
             return res.status(400).send({ status: false, msg: "password is required" })
         }
-        if (!(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[a-zA-Z0-9]{8,}$/).test(userData.password)) {
-            return res.status(400).send({ status: false, msg: "password should contain at least [1,@.,a-zA]" })
-        }
-        if (!(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])[a-zA-Z0-9]{8,}$/).test(userData.resetPasswordToken)) {
-            return res.status(400).send({ status: false, msg: "resetPasswordToken should contain at least [1,@.,a-zA]" })
-        }
+        if (userData.password.length < 8 || userData.password.length > 15)
+            return res.status(400).json({ status: false, msg: "password length be between 8-15" });
+
         let saveData = await usermodel.create(userData)
         let result = {
             _id: saveData._id,
             title: saveData.title,
             name: saveData.name,
             email: saveData.email,
-            password: saveData.password,
-            resetPasswordToken: saveData.resetPasswordToken,
-            createdAt: saveData.createdAt,
-            updatedAt: saveData.updatedAt
+            password: saveData.password
         }
         return res.status(201).send({ status: true, data: result })
 
@@ -74,58 +67,63 @@ const createUser = async function (req, res) {
 
 };
 
-const login = async function (req, res) {
+const login = async (req, res) => {
     try {
-        let data = req.body
-        if (Object.entries(data).length === 0) {
-            res.status(400).send({ status: false, msg: "Kindly pass some data " })
-        }
-
-        let username = req.body.email
-        let password = req.body.password
-
-        if (!username) {
-            return res.status(400).send({ status: false, msg: "Enter Valid Email" })
-        }
-        if (!password) {
-            return res.status(400).send({ status: false, msg: "Enter valid Password" })
-        }
-
-        let user = await usermodel.findOne({ email: username, password: password })
-        if (!user) {
-            return res.status(400).send({ status: false, msg: "credentials dont match,plz check and try again" })
-        }
-
-        let token = jwt.sign({
-            userId: user._id.toString(), exp: Math.floor(Date.now() / 1000) + (60 * 30)
-        }, "Project_3")
-        res.setHeader("x-api-key", token);
-        res.status(200).send({ status: true, data: token })
-
+      if (!isValidRequestBody(req.body))
+        return res.status(400).json({ status: false, msg: "invalid paramaters please provide email-password", });
+  
+      let { email, password } = req.body;
+  
+      if (!isValid(email))
+        return res.status(400).json({ status: false, msg: "email is required" });
+  
+      const findUser = await usermodel.findOne({ email });
+  
+      if (!findUser) {
+        return res.status(401).send({ status: false, message: `Login failed! email is incorrect.` });
+      }
+  
+      if (!isValid(password))
+        return res.status(400).json({ status: false, msg: "password is required" });
+  
+      let enPassword = findUser.password;
+  
+      if (!enPassword) {
+        return res.status(401).send({ status: false, message: `Login failed! password is incorrect.` });
+      }
+  
+      let userId = findUser._id;
+  
+      let token = await jwt.sign(
+        {
+          userId: userId,
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600 * 24 * 7,
+        },
+        "Group-38"
+      );
+  
+      res.status(200).json({ status: true, msg: "loggedin successfully", data: { userId, token }, });
+    } catch (err) {
+      res.status(500).json({ status: false, msg: err.message });
     }
-    catch (error) {
-        console.log(error)
-        res.status(500).send({ status: false, msg: error.message })
-    }
-};
-
+  };
 
 const logout = (req, res) => {
-    return res
-        .clearCookie("access_token")
-        .status(200)
-        .json({ message: "Successfully logged out" });
+    return res.clearCookie("access_token").status(200).json({ message: "Successfully logged out" });
 };
+
+
 
 
 const changePassword = async (req, res) => {
     try {
-        if (!validator.isValidObjectId(req.params.userId))
+        if (!isValidObjectId(req.params.userId))
             return res
                 .status(400)
                 .json({ status: false, message: `${userId} is invalid` });
 
-        const userFound = await UserModel.findOne({ _id: req.params.userId });
+        const userFound = await usermodel.findOne({ _id: req.params.userId });
 
         if (!userFound)
             return res
@@ -138,7 +136,7 @@ const changePassword = async (req, res) => {
                 message: `UnAuthorized access to user`,
             });
 
-        if (!validator.isValidRequestBody(req.body))
+        if (!isValidRequestBody(req.body))
             return res
                 .status(400)
                 .json({ status: false, message: "Please provide details to update" });
@@ -152,12 +150,12 @@ const changePassword = async (req, res) => {
                 .status(400)
                 .json({ status: false, msg: "password length be btw 8-15" });
 
-        if (validator.isValid(password)) {
+        if (isValid(password)) {
             const encryptPass = await bcrypt.hash(password, saltRounds);
             updateUserData["password"] = encryptPass;
         }
 
-        const updatedUserData = await UserModel.findOneAndUpdate(
+        const updatedUserData = await usermodel.findOneAndUpdate(
             { _id: req.params.userId },
             updateUserData,
             { new: true }
@@ -177,4 +175,4 @@ const changePassword = async (req, res) => {
 
 
 
-module.exports = {createUser,login,logout,changePassword}; 
+module.exports = { user, login, logout, changePassword }; 

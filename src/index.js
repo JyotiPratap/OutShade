@@ -1,11 +1,16 @@
+require("dotenv").config();
 const express = require('express');
 var bodyParser = require('body-parser');
 const route = require('./routes/route.js');
+const cookie=require('cookie-parser');
+const multer=require('multer');
+const mongoose = require("mongoose")
+
 
 const app = express();
 app.use(bodyParser.json());
-const mongoose = require("mongoose")
-
+app.use(multer().any())
+app.use(cookie())
 app.use('/', route);
 
 mongoose.connect("mongodb+srv://rubygupta7505:GDDYMfHDEGehjUj0@cluster0.xf64f.mongodb.net/Jyoti2" )
