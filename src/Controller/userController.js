@@ -69,45 +69,45 @@ const user = async function (req, res) {
 
 const login = async (req, res) => {
     try {
-      if (!isValidRequestBody(req.body))
-        return res.status(400).json({ status: false, msg: "invalid paramaters please provide email-password", });
-  
-      let { email, password } = req.body;
-  
-      if (!isValid(email))
-        return res.status(400).json({ status: false, msg: "email is required" });
-  
-      const findUser = await usermodel.findOne({ email });
-  
-      if (!findUser) {
-        return res.status(401).send({ status: false, message: `Login failed! email is incorrect.` });
-      }
-  
-      if (!isValid(password))
-        return res.status(400).json({ status: false, msg: "password is required" });
-  
-      let enPassword = findUser.password;
-  
-      if (!enPassword) {
-        return res.status(401).send({ status: false, message: `Login failed! password is incorrect.` });
-      }
-  
-      let userId = findUser._id;
-  
-      let token = await jwt.sign(
-        {
-          userId: userId,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 3600 * 24 * 7,
-        },
-        "Group-38"
-      );
-  
-      res.status(200).json({ status: true, msg: "loggedin successfully", data: { userId, token }, });
+        if (!isValidRequestBody(req.body))
+            return res.status(400).json({ status: false, msg: "invalid paramaters please provide email-password", });
+
+        let { email, password } = req.body;
+
+        if (!isValid(email))
+            return res.status(400).json({ status: false, msg: "email is required" });
+
+        const findUser = await usermodel.findOne({ email });
+
+        if (!findUser) {
+            return res.status(401).send({ status: false, message: `Login failed! email is incorrect.` });
+        }
+
+        if (!isValid(password))
+            return res.status(400).json({ status: false, msg: "password is required" });
+
+        let enPassword = findUser.password;
+
+        if (!enPassword) {
+            return res.status(401).send({ status: false, message: `Login failed! password is incorrect.` });
+        }
+
+        let userId = findUser._id;
+
+        let token = await jwt.sign(
+            {
+                userId: userId,
+                iat: Math.floor(Date.now() / 1000),
+                exp: Math.floor(Date.now() / 1000) + 3600 * 24 * 7,
+            },
+            "Group-38"
+        );
+
+        res.status(200).json({ status: true, msg: "loggedin successfully", data: { userId, token }, });
     } catch (err) {
-      res.status(500).json({ status: false, msg: err.message });
+        res.status(500).json({ status: false, msg: err.message });
     }
-  };
+};
 
 const logout = (req, res) => {
     return res.clearCookie("access_token").status(200).json({ message: "Successfully logged out" });
