@@ -1,21 +1,33 @@
 const jwt = require("jsonwebtoken");
 
 const authorization = (req, res, next) => {
-  try {
-    const token = req.cookies.access_token;
-
-    if (!token) 
-      return res.status(400).json({ status: false, msg: "token is required" });
-
-    const data = jwt.verify(token, `${process.env.SECRET_KEY}`);
+    try {
+        const token = req.header("Authorization", "Bearer Token");
+        if (!token)
+          return res
+            .status(400)
+            .json({ status: false, msg: " token is not preesnt" });
+     
+        let splitToken = token.split(' ')
     
-    req.userId = data.userId;
-
-    return next();
-
-  } catch (err) {
-    return res.status(500).json({ status: false, msg: err.message });
-  }
-};
+        let decodeToken = jwt.decode(splitToken[1], 'Group-38')
+        if (!decodeToken) {
+            return res.status(403).send({ status: false, message: `Invalid authentication token in request ` })
+        }
+        if (Date.now() > (decodeToken.exp) * 1000) {
+            return res.status(404).send({ status: false, message: `Session Expired, please login again` })
+        }
+         let verify =  jwt.verify(splitToken[1], 'Group-38')
+        if (!verify) {
+            return res.status(403).send({ status: false, message: `Invalid authentication token in request` })
+        }
+        req.userId = decodeToken.userId;
+    
+        next();
+      } catch (error) {
+        res.status(500).json({ status: false, msg: error.message });
+      }
+    };
+    
 
 module.exports = { authorization };
